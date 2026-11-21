@@ -254,6 +254,10 @@
 					abdm: {
 						title: "ABDM 下载",
 						footer: `<p>适用于 <a href="https://abdownloadmanager.com/" target="_blank" class="pl-a" data-no-instant="1"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-link"></use></svg>AB Download Manager</a></p>`
+					},
+					mdm: {
+						title: "MDM 下载",
+						footer: `<p>适用于 <a href="https://github.com/anefzaoui/misterdownloadmanager" target="_blank" class="pl-a" data-no-instant="1"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-link"></use></svg>Mister Download Manager</a></p><p>请在设置中填写 misterdownloadmanager-cli 的完整路径；get 模式在终端中下载并携带全部请求头；add 模式需新版 MDM 且先启动主程序，只携带 Referer / User-Agent / Cookie；Cookie 会留在终端历史记录中</p>`
 					}
 				},
 				copy: {
@@ -262,12 +266,14 @@
 					curl: "点击复制 cURL 命令行",
 					aria2: "Aria2 没启用 RPC？点击复制 Aria2 命令行",
 					bitcomet: "点击打开 BC 地址以手动调起比特彗星下载，右键可复制 BC 地址",
+					mdm: "点击复制 MDM 命令行（get 模式携带全部请求头，Cookie 会留在终端历史记录中）",
 					mirrors: "点击复制镜像地址",
 					all: {
 						link: "点击复制全部下载地址",
 						curl: "点击复制全部 cURL 命令行",
 						aria2: "Aria2 没启用 RPC？点击复制全部 Aria2 命令行",
-						bitcomet: "点击复制全部 BC 地址，可粘贴到比特彗星中下载"
+						bitcomet: "点击复制全部 BC 地址，可粘贴到比特彗星中下载",
+						mdm: "点击复制全部 MDM 命令行（get 模式携带全部请求头，Cookie 会留在终端历史记录中）"
 					}
 				},
 				themes: [
@@ -2252,6 +2258,14 @@
 					value: "wc"
 				},
 				{
+					name: "setting_mdm_cli",
+					value: "misterdownloadmanager-cli"
+				},
+				{
+					name: "setting_mdm_command",
+					value: "get"
+				},
+				{
 					name: "setting_init",
 					value: { code: "", license: "", version: "" }
 				},
@@ -2358,13 +2372,25 @@
 				</label>
 				<label class="${mount} setting-item curl">
 					<div>终端类型</div>
-					<select name="terminal" class="${mount} input swal2-select">
+					<select name="terminal" class="${mount} input swal2-select listener-terminal">
 					${Object.keys(temp.terminalType).map(i => `<option value="${i}" ${base.getValue("setting_curl_terminal") === i ? "selected" : ""}>${temp.terminalType[i]}</option>`).join("")}
+					</select>
+				</label>
+				<label class="${mount} setting-item tip mdm" data-title="MDM 命令行工具 misterdownloadmanager-cli 的完整路径，留空则使用默认名称（需已加入 PATH）">
+					<div>MDM 命令行工具路径</div>
+					<input type="text" autocomplete="off" placeholder="C:\\...\\misterdownloadmanager-cli.exe" class="${mount} input swal2-input listener-mdm-cli" value="">
+				</label>
+				<label class="${mount} setting-item tip mdm" data-title="get 适用于 v0.5.2，在终端中下载并携带全部请求头；add 需新版 MDM，交给主程序下载">
+					<div>MDM 命令类型</div>
+					<select class="${mount} input swal2-select listener-mdm-command">
+						<option value="get" ${base.getValue("setting_mdm_command") !== "add" ? "selected" : ""}>get（v0.5.2 可用，在终端中下载）</option>
+						<option value="add" ${base.getValue("setting_mdm_command") === "add" ? "selected" : ""}>add（新版 MDM，交给主程序下载）</option>
 					</select>
 				</label>
 				<div class="curl" style="display:flex;justify-content:flex-end;"><a href="https://www.youxiaohou.com/zh-cn/curl.html" target="_blank" class="pl-a" data-no-instant="1"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-link"></use></svg> cURL使用教程</a>，适用于 cURL 下载👆</div>
 				<div class="other" style="display:flex;justify-content:center;margin-top:20px"><button class="${mount} btn unregister danger tip" data-title="仅会清除已存储的百度令牌及夸克令牌，其余设置项目无影响，仍会保留"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-x-mark"/></svg><span>熄灭已经点亮的按钮*</span></button></div>
 			</div>`);
+			setting.find(".listener-mdm-cli").attr("value", base.getValue("setting_mdm_cli") || "");
 			Swal.fire({
 				...temp.swalDefault,
 				title: "(｡•ᴗ•｡) 助手设置",
@@ -2379,6 +2405,7 @@
 					const element = $(toast);
 					if (target?.data?.().some(key => key.startsWith("backTo"))) element.find(".swal2-close").addClass(`${mount} tip`).attr("data-title", "返回上页").css({ "left": "10px", "right": "auto" }).text("◃");
 					if (target?.data?.("back-to-downloads")) element.find(".aria2, .bitcomet, .abdm, .other").hide();
+					if (target?.data?.("back-to-downloads") && temp.mode !== "mdm") element.find(".mdm").hide();
 				},
 				willClose: () => {
 					if (target?.data?.("back-to-downloads")) base.showMainDialog(config.base.dom.method[temp.mode].title, download.generateDOM(true), config.base.dom.method[temp.mode].footer);
@@ -3503,6 +3530,7 @@
 				switch (type) {
 					case "idm": base.showIDMSetting(target); break;
 					case "curl": base.showSetting(target); break;
+					case "mdm": base.showSetting(target); break;
 					case "aria2": base.showAria2Setting(target); break;
 					case "bitcomet": base.showBitcometSetting(target); break;
 					case "abdm": base.showABDMSetting(target); break;
@@ -3660,6 +3688,12 @@
 			});
 			$doc.on("change", ".listener-terminal", async (e) => {
 				base.setValue("setting_curl_terminal", e.currentTarget.value);
+			});
+			$doc.on("change", ".listener-mdm-command", async (e) => {
+				base.setValue("setting_mdm_command", e.currentTarget.value === "add" ? "add" : "get");
+			});
+			$doc.on("change", ".listener-mdm-cli", async (e) => {
+				base.setValue("setting_mdm_cli", String(e.currentTarget.value).trim());
 			});
 			$doc.on("click", ".listener-color", async (e) => {
 				const target = $(e.currentTarget).closest(".listener-color").length > 0 ? $(e.currentTarget).closest(".listener-color") : $(e.currentTarget);
@@ -5130,6 +5164,7 @@ button.downloadSubtitle:disabled {
 						case "cmd.curl": line = download.tools.convertTo.curl(link, name, headers); break;
 						case "cmd.aria2": line = download.tools.convertTo.aira2(link, name, headers); break;
 						case "cmd.bitcomet": line = download.tools.convertTo.bitcomet(link, name, headers); break;
+						case "cmd.mdm": line = download.tools.convertTo.mdm(link, name, headers); break;
 						default: break;
 					}
 					if (line) lines.push(line);
@@ -5206,6 +5241,15 @@ button.downloadSubtitle:disabled {
 							<a action="copy" type="file.cmd.curl" class="link ${mount} tip" data-title="${config.base.dom.copy.curl}">${finalink}<br/><svg class="pl-icon"><use xlink:href="#pl-icon-fa-copy"/></svg>复制 ${name} 下载命令行</a>
 						</div>`);
 					}
+					if (temp.mode === "mdm") {
+						const finalink = download.tools.convertTo.mdm(link, name, headers);
+						allLink.push(finalink);
+						content.find(`.${mount}.main`).append(`<div class="item" data-index="${i}">
+							<div class="name ${mount} tip" data-size="${size}"><div class="name">${name}</div><div class="size">${base.sizeFormat(size)}</div></div>
+
+							<a action="copy" type="file.cmd.mdm" class="link ${mount} tip" data-title="${config.base.dom.copy.mdm}">${finalink}<br/><svg class="pl-icon"><use xlink:href="#pl-icon-fa-copy"/></svg>复制 ${name} 的 MDM 命令行</a>
+						</div>`);
+					}
 					if (temp.mode === "aria2") {
 						const finalink = download.tools.convertTo.aira2(link, name, headers);
 						allLink.push(finalink);
@@ -5254,6 +5298,10 @@ button.downloadSubtitle:disabled {
 				content.find(`.${mount}.extra`).append(`<button action="settings" type="curl" class="${mount} btn warning mini tip" data-title="${temp.terminalType[base.getValue("setting_curl_terminal")]}" data-back-to-downloads="true"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-gear"/></svg>修改终端类型</button>`);
 
 				if (files.length >= 2) content.find(`.${mount}.extra`).append(`<button action="copy" type="all.file.cmd.curl" class="${mount} btn default mini curl tip" data-title="${config.base.dom.copy.all.curl}"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-copy"/></svg>复制全部命令行</button>`);
+			} else if (temp.mode === "mdm") {
+				content.find(`.${mount}.extra`).append(`<button action="settings" type="mdm" class="${mount} btn warning mini tip" data-title="${base.getValue("setting_mdm_cli") || "misterdownloadmanager-cli"}" data-back-to-downloads="true"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-gear"/></svg>修改 MDM 设置</button>`);
+
+				if (files.length >= 2) content.find(`.${mount}.extra`).append(`<button action="copy" type="all.file.cmd.mdm" class="${mount} btn default mini mdm tip" data-title="${config.base.dom.copy.all.mdm}"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-copy"/></svg>复制全部命令行</button>`);
 			} else if (temp.mode === "aria2") {
 				const rpc = base.getValue("setting_aria2_rpc").find(i => i.default);
 
@@ -5354,6 +5402,48 @@ button.downloadSubtitle:disabled {
 						}
 					}
 					return `${terminal !== "wp" ? "curl" : "curl.exe"} -L -C - "${link}" -o "${filename}"${headerStr}`;
+				},
+				/**
+				 * 生成 MDM 下载命令
+				 * @description 生成 Mister Download Manager 命令行工具的命令，按终端类型转义参数；get 子命令携带全部请求头（-H），add 子命令仅携带 Referer、User-Agent、Cookie 三种请求头
+				 * @param {String} link - 下载地址
+				 * @param {String} filename - 文件名
+				 * @param {Object} [headers] - 请求头对象（可选）
+				 * @returns {String} 可直接在终端执行的 MDM 命令字符串
+				 */
+				mdm(link, filename, headers) {
+					const terminal = base.getValue("setting_curl_terminal");
+					const cli = base.getValue("setting_mdm_cli") || "misterdownloadmanager-cli";
+					filename = base.fixFilename(filename);
+					headers = base.standHeaders(headers, true, false);
+					// 按终端类型为单个参数加引号并转义
+					const quote = (value) => {
+						const text = String(value).replace(/[\r\n]+/g, " ");
+						if (terminal === "wc") return "\"" + text.replace(/"/g, "\\\"") + "\"";
+						if (terminal === "wp") return "'" + text.replace(/'/g, "''") + "'";
+						return "'" + text.replace(/'/g, "'\\''") + "'";
+					};
+					const command = base.getValue("setting_mdm_command") === "add" ? "add" : "get";
+					if (command === "get") {
+						// get 子命令：在终端中下载，所有请求头均以 -H 传入
+						const getParts = [quote(cli), "get", quote(link), "-o", quote(filename)];
+						if (headers && base.isType(headers) === "object") {
+							for (const [key, value] of Object.entries(headers)) getParts.push("-H", quote(key + ": " + value));
+						}
+						return (terminal === "wp" ? "& " : "") + getParts.join(" ");
+					}
+					const picked = {};
+					if (headers && base.isType(headers) === "object") {
+						for (const [key, value] of Object.entries(headers)) {
+							const name = String(key).toLowerCase();
+							if (name === "referer" || name === "user-agent" || name === "cookie") picked[name] = value;
+						}
+					}
+					const parts = [quote(cli), "add", quote(link), "-f", quote(filename)];
+					if (picked["referer"]) parts.push("-r", quote(picked["referer"]));
+					if (picked["user-agent"]) parts.push("--user-agent", quote(picked["user-agent"]));
+					if (picked["cookie"]) parts.push("--cookie", quote(picked["cookie"]));
+					return (terminal === "wp" ? "& " : "") + parts.join(" ");
 				},
 				/**
 				 * 生成 Aria2 下载命令
@@ -6120,6 +6210,7 @@ button.downloadSubtitle:disabled {
 						<div class="g-button-menu pl-button-mode" data-mode="aria2"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-cloud-arrow-down"/></svg><span>Aria2 下载</span></div>
 						<div class="g-button-menu pl-button-mode" data-mode="bitcomet"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-cloud-arrow-down"/></svg><span>彗星下载</span></div>
 						<div class="g-button-menu pl-button-mode" data-mode="abdm"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-cloud-arrow-down"/></svg><span>ABDM 下载</span></div>
+						<div class="g-button-menu pl-button-mode" data-mode="mdm"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-plug"/></svg><span>MDM 下载</span></div>
 						<div class="g-button-menu pl-button-mode listener-open-setting"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-gear"/></svg><span>助手设置</span></div>
 						<div class="g-button-menu pl-button-mode listener-open-beautify"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-palette"/></svg><span>助手美化</span></div>
 						<div class="g-button-menu pl-button-mode listener-open-updatelog"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-newspaper"/></svg><span>更新日志</span></div>
@@ -6143,6 +6234,7 @@ button.downloadSubtitle:disabled {
 							<li class="sub cursor-p pl-button-mode" data-mode="aria2"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-cloud-arrow-down"/></svg><span>Aria2 下载</span></li>
 							<li class="sub cursor-p pl-button-mode" data-mode="bitcomet"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-cloud-arrow-down"/></svg><span>彗星下载</span></li>
 							<li class="sub cursor-p pl-button-mode" data-mode="abdm"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-cloud-arrow-down"/></svg><span>ABDM 下载</span></li>
+							<li class="sub cursor-p pl-button-mode" data-mode="mdm"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-plug"/></svg><span>MDM 下载</span></li>
 							<li class="sub cursor-p pl-button-mode listener-open-setting"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-gear"/></svg><span>助手设置</span></li>
 							<li class="sub cursor-p pl-button-mode listener-open-beautify"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-palette"/></svg><span>助手美化</span></li>
 							<li class="sub cursor-p pl-button-mode listener-open-updatelog"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-newspaper"/></svg><span>更新日志</span></li>
@@ -6186,6 +6278,7 @@ button.downloadSubtitle:disabled {
 						<li class="sub cursor-p pl-button-mode" data-mode="aria2"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-cloud-arrow-down"/></svg><span>Aria2 下载</span></li>
 						<li class="sub cursor-p pl-button-mode" data-mode="bitcomet"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-cloud-arrow-down"/></svg><span>彗星下载</span></li>
 						<li class="sub cursor-p pl-button-mode" data-mode="abdm"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-cloud-arrow-down"/></svg><span>ABDM 下载</span></li>
+						<li class="sub cursor-p pl-button-mode" data-mode="mdm"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-plug"/></svg><span>MDM 下载</span></li>
 						<li class="sub cursor-p pl-button-mode listener-open-setting"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-gear"/></svg><span>助手设置</span></li>
 						<li class="sub cursor-p pl-button-mode listener-open-beautify"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-palette"/></svg><span>助手美化</span></li>
 						<li class="sub cursor-p pl-button-mode listener-open-updatelog"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-newspaper"/></svg><span>更新日志</span></li>
@@ -6207,6 +6300,7 @@ button.downloadSubtitle:disabled {
 						<li class="sub cursor-p pl-button-mode" data-mode="aria2"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-cloud-arrow-down"/></svg><span>Aria2 下载</span></li>
 						<li class="sub cursor-p pl-button-mode" data-mode="bitcomet"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-cloud-arrow-down"/></svg><span>彗星下载</span></li>
 						<li class="sub cursor-p pl-button-mode" data-mode="abdm"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-cloud-arrow-down"/></svg><span>ABDM 下载</span></li>
+						<li class="sub cursor-p pl-button-mode" data-mode="mdm"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-plug"/></svg><span>MDM 下载</span></li>
 						<li class="sub cursor-p pl-button-mode listener-open-setting"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-gear"/></svg><span>助手设置</span></li>
 						<li class="sub cursor-p pl-button-mode listener-open-beautify"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-palette"/></svg><span>助手美化</span></li>
 						<li class="sub cursor-p pl-button-mode listener-open-updatelog"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-newspaper"/></svg><span>更新日志</span></li>
@@ -6826,6 +6920,7 @@ button.downloadSubtitle:disabled {
 						<li class="pl-button-mode" data-mode="aria2"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-cloud-arrow-down"/></svg><span>Aria2 下载</span></li>
 						<li class="pl-button-mode" data-mode="bitcomet"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-cloud-arrow-down"/></svg><span>彗星下载</span></li>
 						<li class="pl-button-mode" data-mode="abdm"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-cloud-arrow-down"/></svg><span>ABDM 下载</span></li>
+						<li class="pl-button-mode" data-mode="mdm"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-plug"/></svg><span>MDM 下载</span></li>
 						<li class="pl-button-mode listener-open-setting"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-gear"/></svg><span>助手设置</span></li>
 						<li class="pl-button-mode listener-open-beautify"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-palette"/></svg><span>助手美化</span></li>
 						<li class="pl-button-mode listener-open-updatelog"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-newspaper"/></svg><span>更新日志</span></li>
@@ -7100,6 +7195,7 @@ button.downloadSubtitle:disabled {
 						<li class="pl-button-mode" data-mode="aria2"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-cloud-arrow-down"/></svg><span>Aria2 下载</span></li>
 						<li class="pl-button-mode" data-mode="bitcomet"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-cloud-arrow-down"/></svg><span>彗星下载</span></li>
 						<li class="pl-button-mode" data-mode="abdm"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-cloud-arrow-down"/></svg><span>ABDM 下载</span></li>
+						<li class="pl-button-mode" data-mode="mdm"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-plug"/></svg><span>MDM 下载</span></li>
 						<li class="pl-button-mode listener-open-setting"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-gear"/></svg><span>助手设置</span></li>
 						<li class="pl-button-mode listener-open-beautify"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-palette"/></svg><span>助手美化</span></li>
 						<li class="pl-button-mode listener-open-updatelog"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-newspaper"/></svg><span>更新日志</span></li>
@@ -7374,6 +7470,7 @@ button.downloadSubtitle:disabled {
 					<li class="pl-button-mode" data-mode="aria2"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-cloud-arrow-down"/></svg><span>Aria2 下载</span></li>
 					<li class="pl-button-mode" data-mode="bitcomet"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-cloud-arrow-down"/></svg><span>彗星下载</span></li>
 					<li class="pl-button-mode" data-mode="abdm"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-cloud-arrow-down"/></svg><span>ABDM 下载</span></li>
+					<li class="pl-button-mode" data-mode="mdm"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-plug"/></svg><span>MDM 下载</span></li>
 					<li class="pl-button-mode listener-open-setting"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-gear"/></svg><span>助手设置</span></li>
 					<li class="pl-button-mode listener-open-beautify"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-palette"/></svg><span>助手美化</span></li>
 					<li class="pl-button-mode listener-open-updatelog"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-newspaper"/></svg><span>更新日志</span></li>
@@ -7587,6 +7684,7 @@ button.downloadSubtitle:disabled {
 						<li class="pl-button-mode" data-mode="aria2"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-cloud-arrow-down"/></svg><span>Aria2 下载</span></li>
 						<li class="pl-button-mode" data-mode="bitcomet"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-cloud-arrow-down"/></svg><span>彗星下载</span></li>
 						<li class="pl-button-mode" data-mode="abdm"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-cloud-arrow-down"/></svg><span>ABDM 下载</span></li>
+						<li class="pl-button-mode" data-mode="mdm"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-plug"/></svg><span>MDM 下载</span></li>
 						<li class="pl-button-mode listener-open-setting"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-gear"/></svg><span>助手设置</span></li>
 						<li class="pl-button-mode listener-open-beautify"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-palette"/></svg><span>助手美化</span></li>
 						<li class="pl-button-mode listener-open-updatelog"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-newspaper"/></svg><span>更新日志</span></li>
@@ -7927,6 +8025,7 @@ button.downloadSubtitle:disabled {
 					<li class="pl-button-mode" data-mode="aria2"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-cloud-arrow-down"/></svg><span>Aria2 下载</span></li>
 					<li class="pl-button-mode" data-mode="bitcomet"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-cloud-arrow-down"/></svg><span>彗星下载</span></li>
 					<li class="pl-button-mode" data-mode="abdm"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-cloud-arrow-down"/></svg><span>ABDM 下载</span></li>
+					<li class="pl-button-mode" data-mode="mdm"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-plug"/></svg><span>MDM 下载</span></li>
 					<li class="pl-button-mode listener-open-setting"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-gear"/></svg><span>助手设置</span></li>
 					<li class="pl-button-mode listener-open-beautify"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-palette"/></svg><span>助手美化</span></li>
 					<li class="pl-button-mode listener-open-updatelog"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-newspaper"/></svg><span>更新日志</span></li>
@@ -8260,6 +8359,7 @@ button.downloadSubtitle:disabled {
 							<li class="pl-button-mode" data-mode="aria2"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-cloud-arrow-down"/></svg><span>Aria2 下载</span></li>
 							<li class="pl-button-mode" data-mode="bitcomet"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-cloud-arrow-down"/></svg><span>彗星下载</span></li>
 							<li class="pl-button-mode" data-mode="abdm"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-cloud-arrow-down"/></svg><span>ABDM 下载</span></li>
+							<li class="pl-button-mode" data-mode="mdm"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-plug"/></svg><span>MDM 下载</span></li>
 							<li class="pl-button-mode listener-open-setting"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-gear"/></svg><span>助手设置</span></li>
 							<li class="pl-button-mode listener-open-beautify"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-palette"/></svg><span>助手美化</span></li>
 							<li class="pl-button-mode listener-open-updatelog"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-newspaper"/></svg><span>更新日志</span></li>
@@ -8284,6 +8384,7 @@ button.downloadSubtitle:disabled {
 						<li class="pl-button-mode" data-mode="aria2"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-cloud-arrow-down"/></svg><span>Aria2 下载</span></li>
 						<li class="pl-button-mode" data-mode="bitcomet"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-cloud-arrow-down"/></svg><span>彗星下载</span></li>
 						<li class="pl-button-mode" data-mode="abdm"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-cloud-arrow-down"/></svg><span>ABDM 下载</span></li>
+						<li class="pl-button-mode" data-mode="mdm"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-plug"/></svg><span>MDM 下载</span></li>
 						<li class="pl-button-mode listener-open-setting"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-gear"/></svg><span>助手设置</span></li>
 						<li class="pl-button-mode listener-open-beautify"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-palette"/></svg><span>助手美化</span></li>
 						<li class="pl-button-mode listener-open-updatelog"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-newspaper"/></svg><span>更新日志</span></li>
@@ -8572,6 +8673,7 @@ button.downloadSubtitle:disabled {
 						<li class="pl-button-mode" data-mode="aria2"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-cloud-arrow-down"/></svg><span>Aria2 下载</span></li>
 						<li class="pl-button-mode" data-mode="bitcomet"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-cloud-arrow-down"/></svg><span>彗星下载</span></li>
 						<li class="pl-button-mode" data-mode="abdm"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-cloud-arrow-down"/></svg><span>ABDM 下载</span></li>
+						<li class="pl-button-mode" data-mode="mdm"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-plug"/></svg><span>MDM 下载</span></li>
 						<li class="pl-button-mode listener-open-setting"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-gear"/></svg><span>助手设置</span></li>
 						<li class="pl-button-mode listener-open-beautify"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-palette"/></svg><span>助手美化</span></li>
 						<li class="pl-button-mode listener-open-updatelog"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-newspaper"/></svg><span>更新日志</span></li>
@@ -8593,6 +8695,7 @@ button.downloadSubtitle:disabled {
 						<li class="pl-button-mode" data-mode="aria2"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-cloud-arrow-down"/></svg><span>Aria2 下载</span></li>
 						<li class="pl-button-mode" data-mode="bitcomet"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-cloud-arrow-down"/></svg><span>彗星下载</span></li>
 						<li class="pl-button-mode" data-mode="abdm"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-cloud-arrow-down"/></svg><span>ABDM 下载</span></li>
+						<li class="pl-button-mode" data-mode="mdm"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-plug"/></svg><span>MDM 下载</span></li>
 						<li class="pl-button-mode listener-open-setting"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-gear"/></svg><span>助手设置</span></li>
 						<li class="pl-button-mode listener-open-beautify"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-palette"/></svg><span>助手美化</span></li>
 						<li class="pl-button-mode listener-open-updatelog"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-newspaper"/></svg><span>更新日志</span></li>
@@ -9143,6 +9246,7 @@ button.downloadSubtitle:disabled {
 						<li class="pl-button-mode" data-mode="aria2"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-cloud-arrow-down"/></svg><span>Aria2 下载</span></li>
 						<li class="pl-button-mode" data-mode="bitcomet"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-cloud-arrow-down"/></svg><span>彗星下载</span></li>
 						<li class="pl-button-mode" data-mode="abdm"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-cloud-arrow-down"/></svg><span>ABDM 下载</span></li>
+						<li class="pl-button-mode" data-mode="mdm"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-plug"/></svg><span>MDM 下载</span></li>
 						<li class="pl-button-mode listener-open-setting"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-gear"/></svg><span>助手设置</span></li>
 						<li class="pl-button-mode listener-open-beautify"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-palette"/></svg><span>助手美化</span></li>
 						<li class="pl-button-mode listener-open-updatelog"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-newspaper"/></svg><span>更新日志</span></li>
@@ -9164,6 +9268,7 @@ button.downloadSubtitle:disabled {
 						<li class="pl-button-mode" data-mode="aria2"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-cloud-arrow-down"/></svg><span>Aria2 下载</span></li>
 						<li class="pl-button-mode" data-mode="bitcomet"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-cloud-arrow-down"/></svg><span>彗星下载</span></li>
 						<li class="pl-button-mode" data-mode="abdm"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-cloud-arrow-down"/></svg><span>ABDM 下载</span></li>
+						<li class="pl-button-mode" data-mode="mdm"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-plug"/></svg><span>MDM 下载</span></li>
 						<li class="pl-button-mode listener-open-setting"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-gear"/></svg><span>助手设置</span></li>
 						<li class="pl-button-mode listener-open-beautify"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-palette"/></svg><span>助手美化</span></li>
 						<li class="pl-button-mode listener-open-updatelog"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-newspaper"/></svg><span>更新日志</span></li>
