@@ -1,0 +1,8 @@
+{
+	"literals": [
+		"LinkSwift:主代码"
+	],
+	"notes": {
+		"LinkSwift:主代码": "重複執行偵測用的 window 鍵（encodeURIComponent 後掛在 window 上），與原版保持一致才能避免兩版同時安裝時重複注入"
+	}
+}
