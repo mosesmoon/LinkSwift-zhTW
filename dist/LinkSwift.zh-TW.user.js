@@ -260,7 +260,8 @@
 					},
 					mdm: {
 						title: "MDM 下載",
-						footer: `<p>適用於 <a href="https://github.com/anefzaoui/misterdownloadmanager" target="_blank" class="pl-a" data-no-instant="1"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-link"></use></svg>Mister Download Manager</a></p><p>請在設定中填寫 misterdownloadmanager-cli 的完整路徑；get 模式在終端中下載並攜帶全部請求頭；add 模式需新版 MDM 且先啟動主程式，只攜帶 Referer / User-Agent / Cookie；Cookie 會留在終端歷史記錄中</p>`
+						footer: `<p>適用於 <a href="https://github.com/anefzaoui/misterdownloadmanager" target="_blank" class="pl-a" data-no-instant="1"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-link"></use></svg>Mister Download Manager</a></p><p>請在設定中填寫 misterdownloadmanager-cli 的完整路徑；get 模式在終端中下載並攜帶全部請求頭；add 模式需新版 MDM 且先啟動主程式，只攜帶 Referer / User-Agent / Cookie；Cookie 會留在終端歷史記錄中</p><p>“推送到 MDM”需在 MDM 開啟遠端控制並在設定中配對，只發送網址，不攜帶請求頭</p>`,
+						sendto: "通過 MDM 遠端控制 API 推送網址，由 MDM 主程式直接開始下載；<br/><br/>使用前需在 MDM 選項 → 遠端 開啟遠端控制，並在助手設定中填寫網址、完成配對，再在瀏覽器中開啟該網址信任 MDM 的憑證；<br/><b>此方式只發送網址，無法攜帶 User-Agent、Referer、Cookie 與檔名</b>，需要這些請求頭的網盤（如百度網盤、夸克網盤、UC 網盤）會下載失敗，請改用複製命令列；檔名由 MDM 依網址或伺服器回應決定"
 					}
 				},
 				copy: {
@@ -1561,6 +1562,44 @@
 		},
 
 		/**
+		 * 請求 Mister Download Manager 遠端控制 API
+		 * @description MDM 的遠端控制服務（選項 → 遠端）使用自簽名 HTTPS 憑證，並要求配對得到的令牌（Authorization: Bearer）；
+		 * 請求不帶 Origin / Referer，MDM 接受無 Origin 或瀏覽器擴充功能來源的請求
+		 * @param {String} path - API 路徑，如 /api/add
+		 * @param {Object} [body] - JSON 請求體，省略則傳送 GET
+		 * @param {String} [token] - 配對令牌，省略則讀取設定
+		 * @returns {Promise<{status:Number, data:any, error:String}>} status 為 0 表示連線失敗（網址錯誤、服務未開啟或憑證未被信任）
+		 */
+		async mdmRemote(path, body, token) {
+			const server = String(base.getValue("setting_mdm_remote_url") || "https://127.0.0.1:8463").trim().replace(/\/+$/, "");
+			token = token ?? base.getValue("setting_mdm_remote_token") ?? "";
+			const url = server + path;
+			const headers = { "Accept": "application/json" };
+			if (body !== undefined) headers["Content-Type"] = "application/json";
+			if (token) headers["Authorization"] = `Bearer ${token}`;
+			return new Promise((resolve) => {
+				base.xmlHttpRequest({
+					method: body !== undefined ? "POST" : "GET", url, headers, data: body !== undefined ? JSON.stringify(body) : undefined,
+					responseType: "text", anonymous: true, withCredentials: false, timeout: 15 * 1000,
+					onload(res) {
+						let data;
+						try { data = JSON.parse(res.responseText); } catch { data = res.responseText; }
+						base.console.info("【LinkSwift】MDM 遠端控制\n請求網址：" + url + "\n狀態：" + res.status + "\n請求結果：", data);
+						const error = (res.status >= 200 && res.status < 300 && !(data && typeof data === "object" && data.error)) ? "" : String(data?.code || data?.error || `HTTP ${res.status}`);
+						resolve({ status: res.status, data, error });
+					},
+					onerror(error) {
+						base.console.error("【LinkSwift】MDM 遠端控制\n連線失敗（網址錯誤、遠端控制未開啟，或瀏覽器尚未信任 MDM 的憑證）：" + url, error);
+						resolve({ status: 0, data: null, error: "connect" });
+					},
+					ontimeout() {
+						resolve({ status: 0, data: null, error: "timeout" });
+					},
+				});
+			});
+		},
+
+		/**
 		 * 重置請求相關資料
 		 * @author 油小猴
 		 * @description 中止所有進行中的請求，清除進度記錄和定時器
@@ -2269,6 +2308,14 @@
 					value: "get"
 				},
 				{
+					name: "setting_mdm_remote_url",
+					value: "https://127.0.0.1:8463"
+				},
+				{
+					name: "setting_mdm_remote_token",
+					value: ""
+				},
+				{
 					name: "setting_init",
 					value: { code: "", license: "", version: "" }
 				},
@@ -2390,10 +2437,23 @@
 						<option value="add" ${base.getValue("setting_mdm_command") === "add" ? "selected" : ""}>add（新版 MDM，交給主程式下載）</option>
 					</select>
 				</label>
+				<label class="${mount} setting-item tip mdm" data-title="MDM 選項 → 遠端 中顯示的網址；建議將“監聽”設為“僅此電腦”，使用 https://127.0.0.1:8463">
+					<div>MDM 遠端控制網址</div>
+					<input type="text" autocomplete="off" placeholder="https://127.0.0.1:8463" class="${mount} input swal2-input listener-mdm-remote-url" value="">
+				</label>
+				<label class="${mount} setting-item tip mdm" data-title="在 MDM 選項 → 遠端 → 配對裝置 取得 8 位配對碼，填入後點擊配對；配對成功後即可推送">
+					<div>MDM 配對 <span class="listener-mdm-pair-state">${base.getValue("setting_mdm_remote_token") ? "（已配對）" : "（未配對）"}</span></div>
+					<div style="display:flex;gap:6px;align-items:center;">
+						<input type="text" autocomplete="off" inputmode="numeric" placeholder="8 位配對碼" class="${mount} input swal2-input listener-mdm-pair-code" value="" style="max-width:9em">
+						<button class="${mount} btn listener-mdm-pair"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-plug"/></svg><span>配對</span></button>
+						<button class="${mount} btn listener-mdm-test" style="margin-left:0"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-plug"/></svg><span>測試</span></button>
+					</div>
+				</label>
 				<div class="curl" style="display:flex;justify-content:flex-end;"><a href="https://www.youxiaohou.com/zh-cn/curl.html" target="_blank" class="pl-a" data-no-instant="1"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-link"></use></svg> cURL使用教程</a>，適用於 cURL 下載👆</div>
 				<div class="other" style="display:flex;justify-content:center;margin-top:20px"><button class="${mount} btn unregister danger tip" data-title="僅會清除已儲存的百度令牌及夸克令牌，其餘設定專案無影響，仍會保留"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-x-mark"/></svg><span>熄滅已經點亮的按鈕*</span></button></div>
 			</div>`);
 			setting.find(".listener-mdm-cli").attr("value", base.getValue("setting_mdm_cli") || "");
+			setting.find(".listener-mdm-remote-url").attr("value", base.getValue("setting_mdm_remote_url") || "");
 			Swal.fire({
 				...temp.swalDefault,
 				title: "(｡•ᴗ•｡) 助手設定",
@@ -3697,6 +3757,56 @@
 			});
 			$doc.on("change", ".listener-mdm-cli", async (e) => {
 				base.setValue("setting_mdm_cli", String(e.currentTarget.value).trim());
+			});
+			$doc.on("change", ".listener-mdm-remote-url", async (e) => {
+				base.setValue("setting_mdm_remote_url", String(e.currentTarget.value).trim().replace(/\/+$/, ""));
+			});
+			// MDM 遠端控制：錯誤碼對應的提示
+			const mdmRemoteHint = (res) => ({
+				"connect": "無法連線：請確認已開啟 MDM 遠端控制、網址正確，並已在瀏覽器中開啟該網址信任 MDM 的憑證",
+				"timeout": "連線超時：請確認 MDM 正在執行",
+				"wrong-code": `配對碼錯誤${res?.data?.left !== undefined ? `，還可嘗試 ${res.data.left} 次` : ""}`,
+				"no-code": "配對碼已失效，請在 MDM 中點選“新配對碼”",
+				"too-soon": "嘗試過於頻繁，請稍後再試",
+				"not-paired": "尚未配對或配對已被移除，請重新配對",
+				"unknown-host": "MDM 不接受此網址，請改用 MDM 選項 → 遠端 中顯示的網址",
+				"other-origin": "MDM 拒絕了來源，請確認使用的是指令碼管理器擴充功能",
+			})[res?.error] || `失敗：${res?.error || "未知錯誤"}`;
+			const mdmButtonResult = async (target, ok) => {
+				const text = target.find("span");
+				text.html(ok ? "成功" : "失敗");
+				target.css({ "background-color": ok ? "#52c41a" : "#cb1616", "opacity": "" });
+				await base.sleep(3000);
+				target.data("testing", "false");
+				text.html(target.data("text"));
+				target.css({ "background-color": "" });
+			};
+			$doc.on("click", ".listener-mdm-pair", async (e) => {
+				e.preventDefault();
+				const target = $(e.currentTarget);
+				if (target.data("testing") === "true") return;
+				const code = String(target.closest(".setting-item").find(".listener-mdm-pair-code").val() || "").replace(/\s+/g, "");
+				if (!/^\d{8}$/.test(code)) return alert("請輸入 MDM 顯示的 8 位配對碼");
+				target.data({ testing: "true", text: target.find("span").html() }).css({ "opacity": "0.9" }).find("span").html("等待");
+				const res = await base.mdmRemote("/api/pair", { code, name: "LinkSwift" }, "");
+				const ok = !res.error && typeof res.data?.token === "string" && res.data.token;
+				if (ok) {
+					base.setValue("setting_mdm_remote_token", res.data.token);
+					$(".listener-mdm-pair-state").text("（已配對）");
+					target.closest(".setting-item").find(".listener-mdm-pair-code").val("");
+				}
+				if (!ok) alert(mdmRemoteHint(res));
+				await mdmButtonResult(target, ok);
+			});
+			$doc.on("click", ".listener-mdm-test", async (e) => {
+				e.preventDefault();
+				const target = $(e.currentTarget);
+				if (target.data("testing") === "true") return;
+				target.data({ testing: "true", text: target.find("span").html() }).css({ "opacity": "0.9" }).find("span").html("等待");
+				const res = await base.mdmRemote("/api/list");
+				const ok = !res.error;
+				if (!ok) alert(mdmRemoteHint(res));
+				await mdmButtonResult(target, ok);
 			});
 			$doc.on("click", ".listener-color", async (e) => {
 				const target = $(e.currentTarget).closest(".listener-color").length > 0 ? $(e.currentTarget).closest(".listener-color") : $(e.currentTarget);
@@ -5076,6 +5186,7 @@ button.downloadSubtitle:disabled {
 						case "aria2": res = await download.tools.sendTo.aria2(link, name, headers); break;
 						case "bitcomet": res = await download.tools.sendTo.bitcomet(link, name, headers); break;
 						case "abdm": res = await download.tools.sendTo.abdm(link, name, headers); break;
+						case "mdm": res = await download.tools.sendTo.mdm(link); break;
 						default: break;
 					}
 				} catch (e) {
@@ -5251,6 +5362,8 @@ button.downloadSubtitle:disabled {
 							<div class="name ${mount} tip" data-size="${size}"><div class="name">${name}</div><div class="size">${base.sizeFormat(size)}</div></div>
 
 							<a action="copy" type="file.cmd.mdm" class="link ${mount} tip" data-title="${config.base.dom.copy.mdm}">${finalink}<br/><svg class="pl-icon"><use xlink:href="#pl-icon-fa-copy"/></svg>複製 ${name} 的 MDM 命令列</a>
+
+							<button action="sendto" type="mdm" class="${mount} btn info mini tip" data-title="${config.base.dom.method.mdm.sendto}"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-cloud-arrow-up"/></svg><span>推送到 MDM</span></button>
 						</div>`);
 					}
 					if (temp.mode === "aria2") {
@@ -5305,6 +5418,8 @@ button.downloadSubtitle:disabled {
 				content.find(`.${mount}.extra`).append(`<button action="settings" type="mdm" class="${mount} btn warning mini tip" data-title="${base.getValue("setting_mdm_cli") || "misterdownloadmanager-cli"}" data-back-to-downloads="true"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-gear"/></svg>修改 MDM 設定</button>`);
 
 				if (files.length >= 2) content.find(`.${mount}.extra`).append(`<button action="copy" type="all.file.cmd.mdm" class="${mount} btn default mini mdm tip" data-title="${config.base.dom.copy.all.mdm}"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-copy"/></svg>複製全部命令列</button>`);
+
+				if (files.length >= 2) content.find(`.${mount}.extra`).append(`<button action="all" type="sendto.mdm" class="${mount} btn info mini tip" data-title="${config.base.dom.method.mdm.sendto}"><svg class="pl-icon"><use xlink:href="#pl-icon-fa-cloud-arrow-up"/></svg>全部推送到 MDM</button>`);
 			} else if (temp.mode === "aria2") {
 				const rpc = base.getValue("setting_aria2_rpc").find(i => i.default);
 
@@ -5694,6 +5809,20 @@ button.downloadSubtitle:disabled {
 						const res = await base.post(url, data, { "Content-Type": "application/json;charset=UTF-8", "X-Api-Key": rpc.key }, "text", false);
 						if (res === "OK") return "success";
 						return "fail";
+					});
+				},
+				/**
+				 * 傳送網址到 Mister Download Manager（遠端控制 API）
+				 * @description MDM 的 /api/add 只接受網址，無法攜帶請求頭（User-Agent、Referer、Cookie），需要這些請求頭的網盤網址會下載失敗
+				 * @param {String} link - 下載連結
+				 * @returns {Promise<"success"|"fail">} 傳送態結果
+				 */
+				async mdm(link) {
+					if (!this.mdm.lock) this.mdm.lock = Promise.resolve();
+					return this.mdm.lock = this.mdm.lock.then(async () => {
+						if (!base.getValue("setting_mdm_remote_token")) return "fail";
+						const res = await base.mdmRemote("/api/add", { url: link, start: true });
+						return res.error ? "fail" : "success";
 					});
 				},
 			},

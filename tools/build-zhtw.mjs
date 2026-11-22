@@ -101,7 +101,8 @@ export const TERM_FIXES = [
 	["反饋", "回饋"],
 	["彈框", "彈出視窗"],
 	["文本", "文字"],
-	["映象", "鏡像"]
+	["映象", "鏡像"],
+	["證書", "憑證"]
 ];
 
 export function applyTermFixes(s) {

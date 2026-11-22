@@ -42,7 +42,7 @@ LinkSwift 繁中版是以 [hmjz100/LinkSwift](https://github.com/hmjz100/LinkSwi
   - API 下載，可一鍵複製全部連結，或複製 Aria2、cURL 命令。
   - 增強下載，支援多區塊多執行緒。
   - 推送到 Aria2（RPC）、比特彗星、IDM、AB Download Manager（ABDM）。
-  - 複製 Mister Download Manager（MDM）命令列，見下方說明。
+  - Mister Download Manager（MDM）：複製命令列，或透過 MDM 遙控 API 推送，見下方說明。
 - 百度網盤分享頁支援選擇資料夾下載。
 
 ## Mister Download Manager（MDM）下載
@@ -56,6 +56,23 @@ LinkSwift 繁中版是以 [hmjz100/LinkSwift](https://github.com/hmjz100/LinkSwi
 
 > [!WARNING]
 > 命令中會包含 Cookie 等標頭資訊，會留在終端機的歷史紀錄中。若電腦為多人共用，請在使用後清除終端機歷史紀錄。
+
+### 推送到 MDM（遙控 API）
+
+除了複製命令列，每個檔案旁還有「推送到 MDM」按鈕；有多個檔案時，可以使用「全部推送到 MDM」。推送後由 MDM 主程式直接開始下載，不需要開終端機。
+
+> [!IMPORTANT]
+> MDM 的遙控 API 只接收網址，**無法帶上 User-Agent、Referer、Cookie**。需要這些標頭的網盤（例如百度網盤、夸克網盤、UC 網盤）推送後會下載失敗，請改用複製命令列。
+> 推送也不會帶上檔名，檔名由 MDM 依網址或伺服器回應決定。
+
+第一次使用前的設定：
+
+1. 在 MDM 開啟 **Options → Remote**，勾選 **Let phones and computers on the local network control MDM**。**Listen on** 建議選 **This computer only**，只讓本機連線。
+2. 在 LinkSwift 設定的 `MDM 遠端控制網址` 填入 `https://127.0.0.1:8463`。若 Listen on 保留預設值，請改填 MDM 顯示的區網位址，例如 `https://192.168.x.x:8463`。
+3. 用瀏覽器開啟上述網址，瀏覽器會警告憑證不受信任。這是 MDM 在本機自己產生的憑證，可以比對 Options → Remote 顯示的 SHA-256 指紋，確認無誤後選擇繼續前往。若之後推送仍顯示連線失敗，代表腳本管理器不沿用這個例外，需要把 MDM 的憑證匯入 Windows 的「受信任的根憑證授權單位」。
+4. 在 MDM 點擊 **Options → Remote → Pair a device...** 取得 8 位配對碼，填入 LinkSwift 設定的 `MDM 配對` 欄位後按「配對」，顯示「已配對」就完成了。可以按「測試」確認連線。
+
+配對取得的權杖保存在腳本管理器的儲存空間。若要撤銷，在 MDM 的 Options → Remote 選取 LinkSwift 後按 Remove 即可。
 
 MDM 專案：<https://github.com/anefzaoui/misterdownloadmanager>
 
